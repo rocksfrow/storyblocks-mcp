@@ -46,7 +46,7 @@ jobs:
           echo "Releasing version $PKG_VERSION"
 
       - name: Syntax check
-        run: node --check server/*.js
+        run: for f in server/*.js; do node --check "$f" || exit 1; done
 
       - name: Test
         run: npm test

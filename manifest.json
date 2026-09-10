@@ -3,9 +3,9 @@
   "manifest_version": "0.3",
   "name": "storyblocks",
   "display_name": "Storyblocks",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Search and license Storyblocks stock video, audio, and images (API v2) using your own Storyblocks API keys. Zero dependencies.",
-  "long_description": "Exposes the Storyblocks API v2 as MCP tools. This is a bring-your-own-credentials extension: you supply the public and private API keys issued by Storyblocks (free test keys at developer.storyblocks.com/register). The server signs every request with Storyblocks' HMAC-SHA256 scheme locally; your private key is never transmitted. Search footage, motion backgrounds, templates, music, sound effects, photos, illustrations, and vectors with the full set of filters; fetch item metadata and download formats; get licensed full-quality download links; browse categories and curated collections; find similar items; list expiring content; and manage YouTube Content ID claims on Storyblocks audio. This is an independent community project and is not affiliated with, endorsed by, or supported by Storyblocks.",
+  "long_description": "Exposes the Storyblocks API v2 as MCP tools. This is a bring-your-own-credentials extension: you supply the public and private API keys issued by Storyblocks (free test keys at developer.storyblocks.com/register) — nothing else is required. The server signs every request with Storyblocks' HMAC-SHA256 scheme locally; your private key is never transmitted. Search footage, motion backgrounds, templates, music, sound effects, photos, illustrations, and vectors with the full set of filters; fetch item metadata and download formats; get licensed full-quality download links; browse categories and curated collections; find similar items; list expiring content; and manage YouTube Content ID claims on Storyblocks audio. This is an independent community project and is not affiliated with, endorsed by, or supported by Storyblocks.",
   "author": {
     "name": "Kyle Renfrow",
     "url": "https://github.com/rocksfrow"
@@ -58,14 +58,14 @@
     },
     "default_user_id": {
       "type": "string",
-      "title": "Default user id",
-      "description": "Opaque identifier for the end user, required by Storyblocks on search and download requests. Do not use a name or email. Can be overridden per tool call.",
+      "title": "User id (optional — leave blank)",
+      "description": "Leave blank: a random, stable per-install id is generated automatically. Storyblocks does not issue user ids; this is an identifier in YOUR system. Only set it if you embed this server in a multi-user application and already have your own user ids. Letters, numbers, dashes and underscores only — never a name or email (the value is transmitted to Storyblocks).",
       "required": false
     },
     "default_project_id": {
       "type": "string",
-      "title": "Default project id",
-      "description": "Opaque identifier for the project, required by Storyblocks on search and download requests. Can be overridden per tool call.",
+      "title": "Project id (optional — leave blank)",
+      "description": "Leave blank to use \"storyblocks-mcp\". Storyblocks does not issue project ids; this is an identifier in YOUR system. Letters, numbers, dashes and underscores only.",
       "required": false
     }
   },

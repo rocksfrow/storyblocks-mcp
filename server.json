@@ -3,7 +3,7 @@
   "name": "io.github.rocksfrow/storyblocks",
   "title": "Storyblocks",
   "description": "Unofficial Storyblocks API v2 server: search and license stock video, audio, and images.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "repository": {
     "url": "https://github.com/rocksfrow/storyblocks-mcp",
     "source": "github"

@@ -11,6 +11,7 @@
 
 const readline = require('readline');
 const { loadConfig } = require('./config');
+const { resolveIdentity } = require('./identity');
 const { StoryblocksClient } = require('./storyblocks');
 const { TOOLS, callTool, describeError } = require('./tools');
 const { validate } = require('./validate');
@@ -24,7 +25,9 @@ const SUPPORTED_PROTOCOLS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-
 const INSTRUCTIONS =
   'Tools for the Storyblocks stock media API (videos, audio, images). ' +
   'Start with search_* to find items, get_stock_item_details for full metadata, and get_download_links for licensed files. ' +
-  'Search and download require user_id and project_id; supply them or rely on the configured defaults. ' +
+  'Search and download require user_id and project_id; leave them out — the server supplies stable defaults — unless you are acting for a specific end user in a multi-user app. ' +
+  'get_download_links is a licensed download that counts against the account limit and returns URLs that expire in ~30 minutes: call it only once the user has chosen an item. ' +
+  'For image search, leave content_type unset (nearly all images are typed "snapshots"). ' +
   'Read the storyblocks://docs/api-overview resource for a condensed API reference.';
 
 const RESOURCES = [
@@ -40,8 +43,11 @@ const RESOURCES = [
 const TOOLS_BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
 
 let client;
+let identity;
 try {
-  client = new StoryblocksClient(loadConfig());
+  const config = loadConfig();
+  identity = resolveIdentity(config);
+  client = new StoryblocksClient(config, identity);
 } catch (e) {
   process.stderr.write(`[storyblocks-mcp] ${e.message}\n`);
   process.exit(1);
@@ -168,4 +174,7 @@ rl.on('line', (line) => {
 rl.on('close', () => process.exit(0));
 
 // stdout is reserved for the protocol; log to stderr only.
-process.stderr.write(`[storyblocks-mcp] v${SERVER_VERSION} ready (${client.config.baseUrl})\n`);
+process.stderr.write(
+  `[storyblocks-mcp] v${SERVER_VERSION} ready (${client.config.baseUrl}; ` +
+    `user_id ${identity.userIdSource}, project_id "${identity.projectId}" ${identity.projectIdSource})\n`,
+);

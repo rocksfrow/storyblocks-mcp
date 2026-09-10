@@ -68,8 +68,10 @@ const TOOLS = [
     title: 'Get stock item details (batch)',
     description:
       'Get detailed metadata for many stock items of one media type in a single call. ' +
-      'Returns { total_results, total_pages, results: { invalid_stock_ids, stock_ids_not_found, stock_items: [...] } }. ' +
-      'Results are paginated (results_per_page defaults to 10).',
+      'Returns { total_results, results: { invalid_stock_ids, stock_ids_not_found, stock_items: [...] } }. ' +
+      'By default every requested id is returned in one response (all upstream pages are fetched and merged), so ' +
+      'invalid_stock_ids and stock_ids_not_found are always complete. Only set page/results_per_page if you deliberately want ' +
+      'a single upstream page — note Storyblocks reports the invalid/not-found lists only on the final page.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -81,8 +83,12 @@ const TOOLS = [
           maxItems: 500,
           description: 'Stock item ids to look up. Non-numeric values are echoed back under invalid_stock_ids.',
         },
-        page: S.page,
-        results_per_page: { type: 'integer', minimum: 1, description: 'Items per page in the response. Defaults to 10.' },
+        page: { ...S.page, description: 'Upstream page to fetch. Omit (recommended) to fetch and merge all pages.' },
+        results_per_page: {
+          type: 'integer',
+          minimum: 1,
+          description: 'Upstream page size. Omit (recommended) to fetch and merge all pages; Storyblocks defaults to 10 when paginating explicitly.',
+        },
         content_statuses: S.contentStatuses,
         user_id: S.userId,
         project_id: S.projectId,
@@ -97,8 +103,9 @@ const TOOLS = [
     title: 'Get download links',
     description:
       'Get full-quality download URLs for a stock item, keyed by format (e.g. video: { MP4: { _1080p, _720p }, MOV: {...} }; ' +
-      'audio: { MP3, WAV }; image: { JPG, EPS, PDF, PSD }). This is a licensed download event and counts against the download rate limit. ' +
-      'Requires user_id and project_id (or env defaults).',
+      'audio: { MP3, WAV }; image: { JPG, EPS, PDF, PSD }). This is a LICENSED DOWNLOAD EVENT: it counts against the account\'s download ' +
+      'limit, so call it only when the user has chosen an item to use, not while browsing. The URLs are CloudFront-signed and expire about ' +
+      '30 minutes after issue — fetch the bytes immediately and never store the URL. (Preview/thumbnail URLs from search are public and safe to keep.)',
     inputSchema: {
       type: 'object',
       properties: {
@@ -130,10 +137,20 @@ const TOOLS = [
     name: 'list_collections',
     title: 'List curated collections',
     description:
-      'List hand-curated collections/playlists for a media type. Returns [{ id, name, description, num_items, date_added, date_updated }].',
+      'List hand-curated collections/playlists for a media type. Returns { total_results, page, results_per_page, total_pages, ' +
+      'collections: [{ id, name, description?, num_items, date_added, date_updated }] }. Storyblocks returns the whole list (hundreds of ' +
+      'entries) in one response, so this tool pages it for you (50 per page by default) and can filter by name with `search`.',
     inputSchema: {
       type: 'object',
-      properties: { media_type: S.mediaType, user_id: S.userId, project_id: S.projectId },
+      properties: {
+        media_type: S.mediaType,
+        search: { type: 'string', minLength: 1, description: 'Case-insensitive substring to match against collection name or description.' },
+        page: S.page,
+        results_per_page: { type: 'integer', minimum: 1, maximum: 500, description: 'Collections per page. Defaults to 50.' },
+        include_description: { type: 'boolean', description: 'Include each collection\'s description text. Defaults to false to keep responses small.' },
+        user_id: S.userId,
+        project_id: S.projectId,
+      },
       required: ['media_type'],
       additionalProperties: false,
     },
@@ -164,6 +181,7 @@ const TOOLS = [
     title: 'Find similar stock items',
     description:
       'Find stock items similar to a given item ("more like this"). Returns an array of summary stock items. ' +
+      'Not every API key is entitled to this endpoint; a 403 "API function request is invalid" means it is not enabled on the account. ' +
       'Default limit is 8, max 500. Valid `extended` values depend on media type: ' +
       `videos: ${S.VIDEO_EXTENDED.join(', ')}; audio: ${S.AUDIO_EXTENDED.join(', ')}; images: ${S.IMAGE_EXTENDED.join(', ')}.`,
     inputSchema: {
@@ -190,7 +208,8 @@ const TOOLS = [
     title: 'List expiring content',
     description:
       'List stock items that will expire (become undownloadable) within the next 12 months because they were removed from the library. ' +
-      'Returned in batches of 1000: { total_results, results_per_page, total_pages, expiring_items: [{ id, expiration_date }] }.',
+      'Returned in batches of 1000: { total_results, results_per_page, total_pages, expiring_items: [{ id, expiration_date }] }. ' +
+      'Not every API key is entitled to this endpoint; a 403 "API function request is invalid" means it is not enabled on the account.',
     inputSchema: {
       type: 'object',
       properties: { media_type: S.mediaType, page: S.page, user_id: S.userId, project_id: S.projectId },
@@ -321,20 +340,30 @@ async function callTool(client, name, a) {
 
     case 'get_stock_item_details':
       return client.details(a.media_type, a.stock_item_id, { content_statuses: a.content_statuses, ...attribution(client, a, false) });
-    case 'get_stock_items_details_batch':
-      return client.detailsBatch(a.media_type, a.stock_item_ids, {
-        page: a.page,
-        results_per_page: a.results_per_page,
-        content_statuses: a.content_statuses,
-        ...attribution(client, a, false),
-      });
+    case 'get_stock_items_details_batch': {
+      const attr = attribution(client, a, false);
+      if (a.page !== undefined || a.results_per_page !== undefined) {
+        // Caller asked for a specific upstream page: pass through, but flag the upstream quirk.
+        const result = await client.detailsBatch(a.media_type, a.stock_item_ids, {
+          page: a.page,
+          results_per_page: a.results_per_page,
+          content_statuses: a.content_statuses,
+          ...attr,
+        });
+        if (result && result.total_pages > 1 && (a.page || 1) < result.total_pages) {
+          result.note = 'Storyblocks reports invalid_stock_ids and stock_ids_not_found only on the final page. Omit page/results_per_page to fetch all pages merged.';
+        }
+        return result;
+      }
+      return fetchAllBatchPages(client, a.media_type, a.stock_item_ids, { content_statuses: a.content_statuses, ...attr });
+    }
     case 'get_download_links':
       return client.download(a.media_type, a.stock_item_id, attribution(client, a, true));
 
     case 'list_categories':
       return client.categories(a.media_type, attribution(client, a, false));
     case 'list_collections':
-      return client.collections(a.media_type, attribution(client, a, false));
+      return paginateCollections(await client.collections(a.media_type, attribution(client, a, false)), a);
     case 'get_collection_items':
       return client.collectionItems(a.media_type, a.collection_id, { page: a.page, ...attribution(client, a, false) });
     case 'find_similar_stock_items':
@@ -362,12 +391,59 @@ async function callTool(client, name, a) {
   }
 }
 
-function hintForStatus(status) {
+/**
+ * Storyblocks returns the whole batch across upstream pages and only reports
+ * invalid_stock_ids / stock_ids_not_found on the last page. Fetch every page
+ * and merge so callers always get a complete picture.
+ */
+async function fetchAllBatchPages(client, media, ids, query) {
+  const merged = { total_results: 0, results: { invalid_stock_ids: [], stock_ids_not_found: [], stock_items: [] } };
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const r = await client.detailsBatch(media, ids, { ...query, page, results_per_page: ids.length });
+    if (!r || !r.results) return r;
+    merged.total_results = r.total_results !== undefined ? r.total_results : merged.total_results;
+    totalPages = r.total_pages || 1;
+    for (const key of ['invalid_stock_ids', 'stock_ids_not_found', 'stock_items']) {
+      if (Array.isArray(r.results[key])) merged.results[key].push(...r.results[key]);
+    }
+    page += 1;
+  } while (page <= totalPages && page <= 50);
+  merged.pages_fetched = page - 1;
+  return merged;
+}
+
+/** Page and filter the (unpaginated) upstream collections list client-side. */
+function paginateCollections(all, a) {
+  const list = Array.isArray(all) ? all : [];
+  const needle = a.search ? a.search.toLowerCase() : null;
+  const filtered = needle
+    ? list.filter((c) => `${c.name || ''} ${c.description || ''}`.toLowerCase().includes(needle))
+    : list;
+  const perPage = a.results_per_page || 50;
+  const page = a.page || 1;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  const slice = filtered.slice((page - 1) * perPage, page * perPage);
+  const collections = a.include_description
+    ? slice
+    : slice.map(({ description, ...rest }) => rest); // eslint-disable-line no-unused-vars
+  return { total_results: filtered.length, page, results_per_page: perPage, total_pages: totalPages, collections };
+}
+
+function hintForStatus(status, message) {
+  const msg = String(message || '');
   switch (status) {
     case 400:
-      return 'A query parameter is missing or invalid. Check required user_id/project_id and enum values.';
+      if (/project id|user id/i.test(msg)) {
+        return 'user_id/project_id must contain only letters, numbers, dashes and underscores. Omit them to use the server defaults, or fix STORYBLOCKS_DEFAULT_USER_ID / STORYBLOCKS_DEFAULT_PROJECT_ID.';
+      }
+      return 'A query parameter is missing or invalid. Check enum values and pagination limits (page * results_per_page <= 10,000).';
     case 401:
     case 403:
+      if (/API function request is invalid/i.test(msg)) {
+        return 'This endpoint is not enabled for your API key. Your credentials are fine (other endpoints work); the API function must be enabled on your Storyblocks account — contact your Storyblocks account manager or enterprise@storyblocks.com.';
+      }
       return 'Authentication failed. Verify STORYBLOCKS_PUBLIC_KEY / STORYBLOCKS_PRIVATE_KEY and that the system clock is accurate (EXPIRES must be in the future, at most 36h ahead).';
     case 404:
       return 'The stock item or collection id does not exist (or is not available to this API key).';
@@ -381,7 +457,8 @@ function hintForStatus(status) {
 /** Convert a thrown error into the JSON payload returned in an isError tool result. */
 function describeError(err) {
   if (err instanceof StoryblocksApiError) {
-    return { error: err.message, status: err.status, path: err.path, response: err.body, hint: hintForStatus(err.status) };
+    const upstream = err.body && typeof err.body === 'object' && 'errors' in err.body ? JSON.stringify(err.body.errors) : String(err.body || '');
+    return { error: err.message, status: err.status, path: err.path, response: err.body, hint: hintForStatus(err.status, upstream) };
   }
   return { error: err && err.message ? err.message : String(err) };
 }

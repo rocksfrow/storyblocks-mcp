@@ -47,13 +47,17 @@ async function parseBody(response) {
 }
 
 class StoryblocksClient {
-  /** @param {ReturnType<import('./config').loadConfig>} config */
-  constructor(config) {
+  /**
+   * @param {ReturnType<import('./config').loadConfig>} config
+   * @param {{ userId: string, projectId: string }} identity  defaults for user_id / project_id
+   */
+  constructor(config, identity) {
     this.config = config;
+    this.identity = identity;
   }
 
   get defaults() {
-    return { userId: this.config.defaultUserId, projectId: this.config.defaultProjectId };
+    return { userId: this.identity.userId, projectId: this.identity.projectId };
   }
 
   /** Build a fully signed URL. Auth params are set last so callers cannot override them. */

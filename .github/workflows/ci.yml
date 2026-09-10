@@ -28,7 +28,8 @@ jobs:
           node-version: ${{ matrix.node }}
 
       - name: Syntax check
-        run: node --check server/*.js
+        # node --check only inspects the first file it is given, so loop.
+        run: for f in server/*.js; do node --check "$f" || exit 1; done
 
       - name: Test
         run: npm test

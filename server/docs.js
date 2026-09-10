@@ -21,8 +21,12 @@ The "resource" is the URL path only (e.g. /api/v2/videos/stock-item/details/1234
 Auth failures return 40x with { "errors": "..." }.
 
 ## Required attribution
-user_id and project_id are required on all search and download requests. Use opaque ids (never names/emails).
-They tie downloads to searches, aid support replay, and drive contributor revenue share.
+user_id and project_id are required on all search and download requests. They are identifiers in the *integrator's*
+system — Storyblocks does not issue them. Charset: letters, numbers, dashes, underscores (the API only enforces this on
+project_id; user_id is accepted verbatim, so never send names/emails). They tie downloads to searches, aid support
+replay, and de-duplicate repeat downloads for contributor revenue share, so user_id must be stable per person.
+This server defaults project_id to "storyblocks-mcp" and user_id to a random per-install id persisted in
+~/.storyblocks-mcp/user-id (override with STORYBLOCKS_DEFAULT_* or per call).
 
 ## Limits
 Rate limits are per endpoint and per client; test keys have lower limits than full-access keys.
@@ -46,6 +50,8 @@ POST /api/v2/{m}/stock-item/details             Batch details. Body { "stockItem
                                                 Response: { total_results, total_pages, results: { invalid_stock_ids, stock_ids_not_found, stock_items } }
 GET  /api/v2/{m}/stock-item/download/{id}       Full-quality download URLs keyed by format. Requires user_id, project_id.
                                                 videos: { MP4: { _1080p, _720p }, MOV: {...} }  audio: { MP3, WAV }  images: { JPG, EPS, PDF, PSD }
+                                                Licensed download event (counts against download limit). URLs are CloudFront-signed
+                                                and expire ~30 min after issue — fetch immediately, never persist.
 GET  /api/v2/{m}/stock-item/categories          [{ id, name, content_type, category_group? }]
 GET  /api/v2/{m}/collections                    [{ id, name, description, num_items, date_added, date_updated }]
 GET  /api/v2/{m}/collections/{collection_id}    Items in a collection, 100 per page (query: page).
@@ -74,10 +80,17 @@ images: download_formats, keywords, isSensitiveContent, hasTalentReleased, hasPr
 
 ## Errors
 400 { "errors": "..." } invalid/missing query param · 403 { "errors": "..." } auth failure · 404 { "errors": "..." } not found
+403 { "errors": "API function request is invalid." } = endpoint not enabled for this key (seen on similar and
+expiring-content with test keys); credentials are fine, the entitlement is missing.
 
 ## Notes
 - Content returned by search/collections may differ from storyblocks.com due to licensing differences.
 - Removed content stays downloadable for 12 months (see expiring-content).
+- Image content_type: >99% of the image library is typed "snapshots" (including ordinary photos); leave the filter unset.
+- Preview/thumbnail URLs are public, unsigned and safe to store; only /content/ download URLs are signed and short-lived.
+- Observed inconsistencies: summary "type" is lowercase ("footage") while details "type" is title-cased ("Footage");
+  details content_type uses "motion-backgrounds"/"sound-effects" while search filters use "motionbackgrounds"/"sfx";
+  motion backgrounds omit orientation; extended maxResolution in search may be null even when details show 4K.
 - Test keys: https://developer.storyblocks.com/register · Sales: enterprise@storyblocks.com
 `;
 

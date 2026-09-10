@@ -17,17 +17,28 @@ const stockItemId = {
   description: 'Numeric Storyblocks stock item id (the "id" field returned by search).',
 };
 
+/** Charset Storyblocks accepts for user_id / project_id (underscore is accepted despite the API's error text). */
+const ID_PATTERN_SOURCE = '^[A-Za-z0-9_-]+$';
+const ID_PATTERN_DESCRIPTION = 'may only contain letters, numbers, dashes and underscores (never a name, email, hostname or path)';
+
 const userId = {
   type: 'string',
-  minLength: 1,
+  pattern: ID_PATTERN_SOURCE,
+  patternDescription: ID_PATTERN_DESCRIPTION,
   description:
-    'Opaque unique identifier for the end user initiating the request (not a name or email). Falls back to STORYBLOCKS_DEFAULT_USER_ID.',
+    'Opaque identifier for the end user, in YOUR system — Storyblocks does not issue these. ' +
+    'Usually omit it: the server sends a stable per-install id it generated. Supply it only when embedding this server in a ' +
+    'multi-user application that has its own user ids. Letters, numbers, dashes, underscores only; never a name or email ' +
+    '(the raw value is transmitted; Storyblocks uses it to de-duplicate repeat downloads for contributor payments).',
 };
 
 const projectId = {
   type: 'string',
-  minLength: 1,
-  description: 'Opaque unique identifier for the project this request belongs to. Falls back to STORYBLOCKS_DEFAULT_PROJECT_ID.',
+  pattern: ID_PATTERN_SOURCE,
+  patternDescription: ID_PATTERN_DESCRIPTION,
+  description:
+    'Opaque identifier for the project, in YOUR system. Usually omit it: the server sends "storyblocks-mcp" (or the configured default). ' +
+    'Letters, numbers, dashes, underscores only.',
 };
 
 const page = { type: 'integer', minimum: 1, description: '1-based page number of results. Defaults to 1.' };
@@ -127,7 +138,11 @@ const imageSearch = {
   type: 'object',
   properties: {
     ...commonSearch,
-    content_type: enumList(['photos', 'illustrations', 'vectors', 'snapshots', 'all'], 'Image content types to include. Defaults to all.'),
+    content_type: enumList(
+      ['photos', 'illustrations', 'vectors', 'snapshots', 'all'],
+      'Image content types to include. Defaults to all — leave it unset unless you specifically need illustrations or vectors: ' +
+        'over 99% of the image library (including ordinary photography) is typed "snapshots", so filtering to ["photos"] discards almost everything.',
+    ),
     orientation: { type: 'string', enum: ['portrait', 'square', 'landscape', 'all'], description: 'Image orientation filter. Defaults to all.' },
     color: {
       type: 'string',
@@ -145,6 +160,8 @@ const imageSearch = {
 };
 
 module.exports = {
+  ID_PATTERN_SOURCE,
+  ID_PATTERN_DESCRIPTION,
   mediaType,
   stockItemId,
   userId,

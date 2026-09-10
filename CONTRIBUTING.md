@@ -14,7 +14,8 @@ server/
   validate.js          # Minimal JSON Schema validator for tool arguments
   storyblocks.js       # Signed HTTP client for api.storyblocks.com
   auth.js              # HMAC-SHA256 request signing
-  config.js            # Environment variable loading
+  config.js            # Environment variable loading and validation
+  identity.js          # Default user_id (generated, persisted) / project_id
   docs.js              # Condensed API reference exposed as an MCP resource
 test/                  # node:test suites (no test framework needed)
 .github/workflows/     # CI (check/test/pack) and release (pack .mcpb, publish)
@@ -23,7 +24,8 @@ test/                  # node:test suites (no test framework needed)
 The runtime has **zero dependencies** — only Node.js built-ins (`crypto`,
 `readline`, global `fetch`). There is no build step and no lockfile. Please keep
 it that way unless there's a strong reason, and never add anything that opens
-network listeners or reads files outside the project.
+network listeners. The only file the server touches outside the project is the
+generated `user-id` in `STORYBLOCKS_STATE_DIR` (`~/.storyblocks-mcp`).
 
 ## Local development
 
@@ -31,8 +33,7 @@ Requires Node 20+.
 
 ```bash
 cp .env.example .env        # fill in your Storyblocks keys
-node --check server/*.js
-npm test
+npm run check               # syntax-check every server file, then run the tests
 ```
 
 Run against your real keys:
@@ -77,6 +78,7 @@ the MCP Registry (SHA-256 computed in CI; GitHub OIDC auth, no secrets).
 ## Guidelines
 
 - Never commit API keys or `.env` files. `.env.example` uses placeholders only.
+- Never derive `user_id` / `project_id` from hostname, OS username, email or anything else identifying; the raw value is sent to Storyblocks.
 - Keep tool names and descriptions clear and accurate — they are what the model reads.
 - Keep `server/schemas.js` in sync with the [Storyblocks API reference](https://documentation.storyblocks.com/).
 - When you add or rename a tool, update the `tools` list in `manifest.json` (CI checks they match) and the README.

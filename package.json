@@ -1,6 +1,6 @@
 {
   "name": "storyblocks-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Storyblocks API v2 as an MCP server — search and license stock video, audio, and images from Claude, Cursor, and any MCP client. Zero dependencies.",
   "private": true,
   "license": "MIT",
@@ -37,7 +37,7 @@
   "scripts": {
     "start": "node server/index.js",
     "test": "node --test test/*.test.js",
-    "check": "node --check server/*.js && npm test",
+    "check": "for f in server/*.js; do node --check \"$f\" || exit 1; done && npm test",
     "mcpb:validate": "npx --yes @anthropic-ai/mcpb validate manifest.json",
     "mcpb:pack": "npx --yes @anthropic-ai/mcpb pack . storyblocks.mcpb",
     "inspect": "npx --yes @modelcontextprotocol/inspector node server/index.js"

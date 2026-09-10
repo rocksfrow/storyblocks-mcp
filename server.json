@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.rocksfrow/storyblocks",
+  "title": "Storyblocks",
+  "description": "Storyblocks API v2 — search and license stock video, audio, and images with your own API keys. Unofficial; not affiliated with Storyblocks.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/rocksfrow/storyblocks-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/rocksfrow/storyblocks-mcp/releases/download/v0.1.0/storyblocks.mcpb",
+      "fileSha256": "set-by-ci-at-release-time",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+name: CI
+
+# Runs on every push and pull request: syntax check, tests, stdio smoke test,
+# manifest validation, and a dry-run pack so packaging breakage is caught early.
+# There is nothing to install: the server has zero dependencies.
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ["20", "22", "24"]
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Syntax check
+        run: node --check server/*.js
+
+      - name: Test
+        run: npm test
+
+      - name: Smoke-test server over stdio
+        env:
+          STORYBLOCKS_PUBLIC_KEY: ci-public
+          STORYBLOCKS_PRIVATE_KEY: ci-private
+        run: |
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+            '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            | node server/index.js | tee /tmp/smoke.jsonl
+          grep -q '"name":"search_videos"' /tmp/smoke.jsonl
+
+      - name: Validate manifest
+        run: npx --yes @anthropic-ai/mcpb validate manifest.json
+
+      - name: Manifest tools match server tools
+        run: |
+          node -e '
+            const m = require("./manifest.json").tools.map(t => t.name).sort();
+            const s = require("./server/tools.js").TOOLS.map(t => t.name).sort();
+            if (JSON.stringify(m) !== JSON.stringify(s)) {
+              console.error("manifest.json tools:", m, "\nserver tools:", s); process.exit(1);
+            }
+            console.log(`manifest lists all ${s.length} tools`);
+          '
+
+      - name: Pack bundle (dry run)
+        if: matrix.node == '22'
+        run: |
+          npx --yes @anthropic-ai/mcpb pack . storyblocks.mcpb
+          npx --yes @anthropic-ai/mcpb info storyblocks.mcpb
+          unzip -l storyblocks.mcpb
+          # The bundle must contain exactly these files and nothing else.
+          unzip -Z1 storyblocks.mcpb | sort > /tmp/actual.txt
+          { printf '%s\n' LICENSE README.md manifest.json package.json; ls server/*.js; } | sort > /tmp/expected.txt
+          diff /tmp/expected.txt /tmp/actual.txt || { echo "Bundle contents differ from expected"; exit 1; }

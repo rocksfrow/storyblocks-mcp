@@ -1,0 +1,115 @@
+name: Build and Release MCPB
+
+# On a version tag (e.g. v1.0.0) this:
+#   1. verifies the tag matches package.json, then syntax-checks and tests
+#   2. builds the .mcpb bundle
+#   3. attaches it to a GitHub Release
+#   4. publishes the server to the MCP Registry (hash + metadata computed here,
+#      authenticated via GitHub OIDC — no secrets, no manual SHA needed)
+#
+# workflow_dispatch builds and uploads the bundle as an artifact only.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  BUNDLE: storyblocks.mcpb
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "lts/*"
+
+      - name: Verify tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          TAG_VERSION="${TAG#v}"
+          PKG_VERSION="$(jq -r .version package.json)"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "Tag $TAG does not match package.json version $PKG_VERSION"; exit 1
+          fi
+          echo "Releasing version $PKG_VERSION"
+
+      - name: Syntax check
+        run: node --check server/*.js
+
+      - name: Test
+        run: npm test
+
+      - name: Validate manifest
+        run: npx --yes @anthropic-ai/mcpb validate manifest.json
+
+      - name: Stamp manifest version from tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          jq --arg v "$VERSION" '.version=$v' manifest.json > m.tmp && mv m.tmp manifest.json
+          echo "manifest version -> $VERSION"
+
+      - name: Pack bundle
+        run: npx --yes @anthropic-ai/mcpb pack . "$BUNDLE"
+
+      - name: Show bundle info
+        run: |
+          npx --yes @anthropic-ai/mcpb info "$BUNDLE"
+          unzip -l "$BUNDLE"
+          # The bundle must contain exactly these files and nothing else.
+          unzip -Z1 "$BUNDLE" | sort > /tmp/actual.txt
+          { printf '%s\n' LICENSE README.md manifest.json package.json; ls server/*.js; } | sort > /tmp/expected.txt
+          diff /tmp/expected.txt /tmp/actual.txt || { echo "Bundle contents differ from expected"; exit 1; }
+
+      - name: Upload bundle as build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: storyblocks-mcpb
+          path: ${{ env.BUNDLE }}
+
+      - name: Attach bundle to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.BUNDLE }}
+          generate_release_notes: true
+
+      # ---- Publish to the MCP Registry (tags only) ----
+
+      - name: Fill server.json (version, asset URL, SHA-256)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${BUNDLE}"
+          SHA="$(sha256sum "$BUNDLE" | awk '{print $1}')"
+          jq --arg v "$VERSION" --arg id "$URL" --arg sha "$SHA" \
+            '.version=$v | .packages[0].identifier=$id | .packages[0].fileSha256=$sha' \
+            server.json > server.tmp && mv server.tmp server.json
+          echo "Published metadata:"; cat server.json
+
+      - name: Install mcp-publisher
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        if: startsWith(github.ref, 'refs/tags/')
+        run: ./mcp-publisher publish

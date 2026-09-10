@@ -1,0 +1,95 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-latest.schema.json",
+  "manifest_version": "0.3",
+  "name": "storyblocks",
+  "display_name": "Storyblocks",
+  "version": "0.1.0",
+  "description": "Search and license Storyblocks stock video, audio, and images (API v2) using your own Storyblocks API keys. Zero dependencies.",
+  "long_description": "Exposes the Storyblocks API v2 as MCP tools. This is a bring-your-own-credentials extension: you supply the public and private API keys issued by Storyblocks (free test keys at developer.storyblocks.com/register). The server signs every request with Storyblocks' HMAC-SHA256 scheme locally; your private key is never transmitted. Search footage, motion backgrounds, templates, music, sound effects, photos, illustrations, and vectors with the full set of filters; fetch item metadata and download formats; get licensed full-quality download links; browse categories and curated collections; find similar items; list expiring content; and manage YouTube Content ID claims on Storyblocks audio. This is an independent community project and is not affiliated with, endorsed by, or supported by Storyblocks.",
+  "author": {
+    "name": "Kyle Renfrow",
+    "url": "https://github.com/rocksfrow"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rocksfrow/storyblocks-mcp"
+  },
+  "homepage": "https://github.com/rocksfrow/storyblocks-mcp",
+  "documentation": "https://github.com/rocksfrow/storyblocks-mcp#readme",
+  "support": "https://github.com/rocksfrow/storyblocks-mcp/issues",
+  "license": "MIT",
+  "keywords": [
+    "storyblocks",
+    "stock-video",
+    "stock-footage",
+    "stock-audio",
+    "stock-music",
+    "sound-effects",
+    "stock-images",
+    "royalty-free"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {
+        "STORYBLOCKS_PUBLIC_KEY": "${user_config.public_key}",
+        "STORYBLOCKS_PRIVATE_KEY": "${user_config.private_key}",
+        "STORYBLOCKS_DEFAULT_USER_ID": "${user_config.default_user_id}",
+        "STORYBLOCKS_DEFAULT_PROJECT_ID": "${user_config.default_project_id}"
+      }
+    }
+  },
+  "user_config": {
+    "public_key": {
+      "type": "string",
+      "title": "Storyblocks public key",
+      "description": "The public API key issued by Storyblocks (sent as the APIKEY parameter). Get free test keys at https://developer.storyblocks.com/register.",
+      "required": true
+    },
+    "private_key": {
+      "type": "string",
+      "title": "Storyblocks private key",
+      "description": "The secret API key issued by Storyblocks. Used only to compute the request HMAC locally; never transmitted.",
+      "required": true,
+      "sensitive": true
+    },
+    "default_user_id": {
+      "type": "string",
+      "title": "Default user id",
+      "description": "Opaque identifier for the end user, required by Storyblocks on search and download requests. Do not use a name or email. Can be overridden per tool call.",
+      "required": false
+    },
+    "default_project_id": {
+      "type": "string",
+      "title": "Default project id",
+      "description": "Opaque identifier for the project, required by Storyblocks on search and download requests. Can be overridden per tool call.",
+      "required": false
+    }
+  },
+  "tools": [
+    { "name": "search_videos", "description": "Search stock footage, motion backgrounds, and templates." },
+    { "name": "search_audio", "description": "Search royalty-free music and sound effects." },
+    { "name": "search_images", "description": "Search stock photos, illustrations, vectors, and snapshots." },
+    { "name": "get_stock_item_details", "description": "Get full metadata and download formats for one stock item." },
+    { "name": "get_stock_items_details_batch", "description": "Get metadata for many stock items in one call." },
+    { "name": "get_download_links", "description": "Get licensed full-quality download URLs for a stock item." },
+    { "name": "list_categories", "description": "List browsable categories for a media type." },
+    { "name": "list_collections", "description": "List hand-curated collections for a media type." },
+    { "name": "get_collection_items", "description": "List the stock items inside a curated collection." },
+    { "name": "find_similar_stock_items", "description": "Find stock items similar to a given item." },
+    { "name": "list_expiring_content", "description": "List removed items that remain downloadable for a limited time." },
+    { "name": "whitelist_youtube_channel", "description": "Whitelist a YouTube channel to auto-clear Content ID claims on Storyblocks audio." },
+    { "name": "file_youtube_audio_dispute", "description": "File a dispute for a YouTube Content ID claim on Storyblocks audio." },
+    { "name": "list_valid_claimants", "description": "List claimant names accepted by the dispute endpoint." },
+    { "name": "storyblocks_raw_request", "description": "Send any signed GET/POST request to a /api/v2 path." }
+  ],
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  }
+}

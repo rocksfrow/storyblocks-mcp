@@ -1,0 +1,18 @@
+# Build output
+*.mcpb
+
+# Tooling deps (no runtime or dev deps required; npx may create these)
+node_modules/
+package-lock.json
+
+# Local secrets (never commit)
+.env
+.env.*
+!.env.example
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/

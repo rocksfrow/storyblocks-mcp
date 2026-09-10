@@ -1,0 +1,16 @@
+# Files excluded from the packed .mcpb bundle.
+# The bundle ships only: manifest.json, package.json, README.md, LICENSE, server/*.js
+.git/
+.github/
+.gitignore
+.mcpbignore
+.env
+.env.example
+CONTRIBUTING.md
+server.json
+test/
+node_modules/
+package-lock.json
+*.mcpb
+*.log
+.DS_Store

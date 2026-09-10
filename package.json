@@ -1,0 +1,45 @@
+{
+  "name": "storyblocks-mcp",
+  "version": "0.1.0",
+  "description": "Storyblocks API v2 as an MCP server — search and license stock video, audio, and images from Claude, Cursor, and any MCP client. Zero dependencies.",
+  "private": true,
+  "license": "MIT",
+  "author": {
+    "name": "Kyle Renfrow",
+    "url": "https://github.com/rocksfrow"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rocksfrow/storyblocks-mcp.git"
+  },
+  "homepage": "https://github.com/rocksfrow/storyblocks-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/rocksfrow/storyblocks-mcp/issues"
+  },
+  "keywords": [
+    "storyblocks",
+    "stock-video",
+    "stock-audio",
+    "stock-images",
+    "stock-footage",
+    "royalty-free",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol"
+  ],
+  "main": "server/index.js",
+  "bin": {
+    "storyblocks-mcp": "server/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test test/*.test.js",
+    "check": "node --check server/*.js && npm test",
+    "mcpb:validate": "npx --yes @anthropic-ai/mcpb validate manifest.json",
+    "mcpb:pack": "npx --yes @anthropic-ai/mcpb pack . storyblocks.mcpb",
+    "inspect": "npx --yes @modelcontextprotocol/inspector node server/index.js"
+  }
+}

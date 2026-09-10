@@ -332,11 +332,11 @@ function withoutAttribution(args) {
 async function callTool(client, name, a) {
   switch (name) {
     case 'search_videos':
-      return client.search('videos', { ...withoutAttribution(a), ...attribution(client, a, true) });
+      return annotateEmptySearch(await client.search('videos', { ...withoutAttribution(a), ...attribution(client, a, true) }), a);
     case 'search_audio':
-      return client.search('audio', { ...withoutAttribution(a), ...attribution(client, a, true) });
+      return annotateEmptySearch(await client.search('audio', { ...withoutAttribution(a), ...attribution(client, a, true) }), a);
     case 'search_images':
-      return client.search('images', { ...withoutAttribution(a), ...attribution(client, a, true) });
+      return annotateEmptySearch(await client.search('images', { ...withoutAttribution(a), ...attribution(client, a, true) }), a);
 
     case 'get_stock_item_details':
       return client.details(a.media_type, a.stock_item_id, { content_statuses: a.content_statuses, ...attribution(client, a, false) });
@@ -412,6 +412,24 @@ async function fetchAllBatchPages(client, media, ids, query) {
   } while (page <= totalPages && page <= 50);
   merged.pages_fetched = page - 1;
   return merged;
+}
+
+/**
+ * required_keywords / filtered_keywords have been observed to return 0 results
+ * upstream even for indexed terms, with no error. Don't let that look like
+ * "no such footage exists": say what to try instead.
+ */
+function annotateEmptySearch(result, a) {
+  if (!result || result.total_results !== 0) return result;
+  const used = ['required_keywords', 'filtered_keywords'].filter((k) => Array.isArray(a[k]) && a[k].length > 0);
+  if (used.length === 0) return result;
+  return {
+    ...result,
+    hint:
+      `0 results with ${used.join(' and ')} set. Storyblocks has been observed to return nothing for this filter even when the term is ` +
+      'an indexed keyword. Retry without it, narrowing instead by adding words to `keywords` and using structural filters ' +
+      '(min_duration, quality, orientation, categories).',
+  };
 }
 
 /** Page and filter the (unpaginated) upstream collections list client-side. */

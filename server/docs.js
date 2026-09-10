@@ -86,6 +86,9 @@ expiring-content with test keys); credentials are fine, the entitlement is missi
 ## Notes
 - Content returned by search/collections may differ from storyblocks.com due to licensing differences.
 - Removed content stays downloadable for 12 months (see expiring-content).
+- required_keywords / filtered_keywords (comma-separated, per docs) have been observed to return 0 results for indexed
+  terms with no error. Narrow with more words in keywords + structural filters instead. sort_by=most_downloaded ranks the
+  whole pool by popularity and drifts off-topic; keep most_relevant for subject searches.
 - Image content_type: >99% of the image library is typed "snapshots" (including ordinary photos); leave the filter unset.
 - Preview/thumbnail URLs are public, unsigned and safe to store; only /content/ download URLs are signed and short-lived.
 - Observed inconsistencies: summary "type" is lowercase ("footage") while details "type" is title-cased ("Footage");

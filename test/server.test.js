@@ -47,6 +47,11 @@ before(async () => {
         res.writeHead(400, { 'content-type': 'application/json' });
         return res.end(JSON.stringify({ errors: { project_id: ['The project id may only contain letters, numbers, and dashes.'] } }));
       }
+      // Upstream quirk (B7): required_keywords yields zero results with no error.
+      if (url.pathname.endsWith('/search') && url.searchParams.has('required_keywords')) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ total_results: 0, results: [] }));
+      }
       // Entitlement-gated endpoint.
       if (url.pathname.includes('/stock-item/similar/')) {
         res.writeHead(403, { 'content-type': 'application/json' });
@@ -212,6 +217,15 @@ test('full protocol flow against a mock API', async () => {
     assert.equal(last.query.user_id, 'u-1');
     assert.equal(last.query.project_id, 'p-1');
     assert.equal(last.query.results_per_page, '5');
+
+    // required_keywords: wire format is the documented comma-separated string; an empty result gets a hint (B7)
+    r = await s.call('search_videos', { keywords: 'sunset', required_keywords: ['sunset', 'ocean'] });
+    assert.equal(r.isError, false);
+    assert.equal(seen.at(-1).query.required_keywords, 'sunset,ocean');
+    assert.equal(r.json.total_results, 0);
+    assert.match(r.json.hint, /required_keywords/);
+    r = await s.call('search_videos', { keywords: 'sunset' });
+    assert.equal(r.json.hint, undefined, 'no hint when the filter was not used');
 
     // explicit attribution overrides env default
     r = await s.call('search_audio', { keywords: 'jazz', min_bpm: 90, user_id: 'u-2', project_id: 'p-2' });

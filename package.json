@@ -1,6 +1,6 @@
 {
   "name": "storyblocks-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Storyblocks API v2 as an MCP server — search and license stock video, audio, and images from Claude, Cursor, and any MCP client. Zero dependencies.",
   "private": true,
   "license": "MIT",

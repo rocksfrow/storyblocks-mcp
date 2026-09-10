@@ -78,8 +78,15 @@ const ANY_EXTENDED = [...new Set([...VIDEO_EXTENDED, ...AUDIO_EXTENDED, ...IMAGE
 /** Search parameters shared by all three media types. */
 const commonSearch = {
   keywords: { type: 'string', description: 'Free-text search terms. Multiple terms may be separated with commas.' },
-  required_keywords: stringList('Content must match ALL of these keywords.'),
-  filtered_keywords: stringList('Content must NOT match any of these keywords.'),
+  required_keywords: stringList(
+    'Content must match ALL of these keywords (sent comma-separated, as documented). CAUTION: in practice this filter has been observed ' +
+      'to return 0 results even for terms that appear in items\' keyword lists. To narrow a search, prefer adding words to `keywords` ' +
+      '(e.g. "sunset ocean horizon") plus structural filters (min_duration, quality, orientation). If you use it and get 0 results, retry without it.',
+  ),
+  filtered_keywords: stringList(
+    'Content must NOT match any of these keywords (sent comma-separated, as documented). Shares the same upstream code path as ' +
+      'required_keywords, whose reliability is questionable — verify results rather than assuming exclusion worked.',
+  ),
   categories: {
     type: 'array',
     items: { anyOf: [{ type: 'integer' }, { type: 'string', minLength: 1 }] },
@@ -92,7 +99,10 @@ const commonSearch = {
   sort_by: {
     type: 'string',
     enum: ['most_relevant', 'most_downloaded', 'most_recent', 'trending_now', 'undiscovered'],
-    description: 'Sort results by an internal metric. Defaults to most_relevant.',
+    description:
+      'Sort order. Defaults to most_relevant, which is the right choice for topical searches. most_downloaded / trending_now rank the ' +
+      'whole matching pool by popularity, so generically popular clips outrank on-topic ones (a "sunset" search returned NYC street scenes) — ' +
+      'use them only for browsing what is popular, not for finding footage of a specific subject.',
   },
   sort_order: { type: 'string', enum: ['ASC', 'DESC'], description: 'Sort direction.' },
   user_id: userId,

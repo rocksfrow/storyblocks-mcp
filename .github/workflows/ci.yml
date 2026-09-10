@@ -48,6 +48,19 @@ jobs:
       - name: Validate manifest
         run: npx --yes @anthropic-ai/mcpb validate manifest.json
 
+      - name: Check server.json against MCP Registry limits
+        run: |
+          node -e '
+            const s = require("./server.json");
+            const fail = (m) => { console.error(m); process.exit(1); };
+            if (s.description.length > 100) fail(`server.json description is ${s.description.length} chars (registry max 100)`);
+            if (s.title && s.title.length > 100) fail("server.json title too long");
+            if (!/^io\.github\.[^/]+\/[^/]+$/.test(s.name)) fail(`unexpected server.json name: ${s.name}`);
+            if (s.version !== require("./package.json").version) fail("server.json version does not match package.json");
+            if (require("./manifest.json").version !== require("./package.json").version) fail("manifest.json version does not match package.json");
+            console.log("server.json OK");
+          '
+
       - name: Manifest tools match server tools
         run: |
           node -e '
